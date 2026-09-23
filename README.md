@@ -116,3 +116,9 @@ While running, the device serves a minimal status page at `http://<device-ip>/`:
 - Aircraft data: [modes_logger](https://github.com/oh2gax/modes_logger) by OH2GAX
 - Weather data: [aviationweather.gov Data API](https://aviationweather.gov/data/api/)
 - E-paper driver: [GxEPD2](https://github.com/ZinggJM/GxEPD2)
+
+## License
+
+This project is licensed under the GNU General Public License v3.0. You are free to use, study, modify and distribute this software under the terms of the GPLv3. Any derivative work must also be distributed under the same license.
+
+See the [LICENSE](LICENSE) file for the full license text, or visit https://www.gnu.org/licenses/gpl-3.0.html.
