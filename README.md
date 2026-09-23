@@ -15,7 +15,8 @@ The device has no aircraft list of its own. `modes_logger` decides what's worth 
 - Runs a small read-only web status page (WiFi signal, free heap, last-fetch status, weather API health) plus a `/restart` endpoint.
 - Built for long unattended uptime: task watchdog with self-restart, WiFi auto-reconnect, explicit HTTP timeouts, and a single reused JSON buffer to keep heap fragmentation down over weeks/months.
 
-![APWS e-paper display showing two flagged aircraft cards - a Russian-registered aircraft with the solid star icon, and a military-watchlist aircraft with the boxed airscrew icon](DisplayScreenshot1.png)
+<img src="DisplayScreenshot1.png" alt="APWS e-paper display showing two flagged aircraft cards - a Russian-registered aircraft with the solid star icon, and a military-watchlist aircraft with the boxed airscrew icon" width="416">
+<!-- 416px = 50% of the source screenshot's native 832px width. Plain markdown image syntax has no size control, so this uses GitHub's support for raw HTML in README files instead. -->
 
 *The display with two flagged aircraft: a Russian-registered aircraft (star icon) and a military-watchlist match (boxed airscrew icon).*
 
