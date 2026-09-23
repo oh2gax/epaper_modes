@@ -1,0 +1,15 @@
+# WiFi credentials - never commit these (see secrets.h.example for the template)
+secrets.h
+
+# Arduino / PlatformIO build artifacts
+build/
+.pio/
+*.hex
+*.elf
+*.bin
+*.map
+
+# Editor / OS clutter
+.vscode/
+.DS_Store
+Thumbs.db
