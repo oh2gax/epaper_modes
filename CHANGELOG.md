@@ -6,6 +6,7 @@ All notable changes to the epaper_modes (APWS) sketch, most recent first.
 
 - **Widened the military-watchlist icon to the NATO frame proportion.** The box around the airscrew is now 47×31px (NATO's 1.5:1 friendly-unit frame) instead of a 31×31 square. Height and right edge are unchanged; the extra width extends toward the card text, which still has plenty of room.
 - **Added an icon for government and civil watchlist matches** (`G`/`C`): the same NATO-style box, but with an outlined airscrew instead of a filled one (the "Aviation (Alternate)" style). It comes last in icon priority (squawk alarm, Russian, military, then government/civil), and these aircraft don't get a sort boost, since nearly every flagged aircraft is a mil/gov/civ match anyway.
+- **Lined up all card icons in one column.** The Russian star (and the squawk-alarm triangle) are now centered on the same point as the wider military/government/civil box, instead of sitting further right, so icons on different cards line up with each other.
 - **Updated the README screenshot** to show all three card icons (Russian star, military filled airscrew, civil outlined airscrew) with the new wider box. It's a pixel-accurate rendering of the panel rather than a photo.
 
 ## 2026-09-23

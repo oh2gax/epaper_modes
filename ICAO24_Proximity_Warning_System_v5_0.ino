@@ -785,6 +785,14 @@ static void drawFilledStar(int cx, int cy, int outerRadius) {
 // With the shared 31px icon height this gives a 47x31px box.
 static const float AVIATION_BOX_ASPECT = 1.5f;
 
+// Half-width of the aviation box for a given shared icon "half" size: the
+// box is inset 2px from "half" vertically (31px tall at half=17) and 1.5x
+// that horizontally (47px wide). Used both to draw the box and, at the call
+// site in renderAircraftTable(), to place the shared icon column.
+static int aviationBoxHalfW(int half) {
+  return (int)lroundf((half - 2) * AVIATION_BOX_ASPECT);
+}
+
 // Draws a simplified NATO-style aviation icon: a closed rectangular box in
 // the NATO 1.5:1 frame proportion (per APP-6 the real air-domain frame is
 // open at the bottom, but a closed box reads more cleanly at this icon's
@@ -800,17 +808,15 @@ static const float AVIATION_BOX_ASPECT = 1.5f;
 // as an "infinity" sign rather than a propeller, so the straight-edged
 // bowtie was kept for both.)
 //
-// Unlike the star and the squawk triangle, this box is WIDER than the
-// shared square "half" envelope, so it's positioned by its RIGHT edge rather
-// than its center: rightX is pinned to where the old square box's right edge
-// was (the panel's right margin), and the extra width grows leftward toward
-// the card text only. The box height stays inset 2px from "half" (31px
-// tall at half=17), so its vertical clearance above the card separator is
-// unchanged.
-static void drawAviationIcon(int rightX, int cy, int half, bool filled) {
+// Centered on (cx, cy), the same center the star and squawk triangle use,
+// so all icons line up in one column. The box is wider than the star/
+// triangle, so it's the widest icon and its right edge sets the column's
+// position (see the call site in renderAircraftTable()). The box height
+// stays inset 2px from "half" (31px tall at half=17), so its vertical
+// clearance above the card separator is unchanged.
+static void drawAviationIcon(int cx, int cy, int half, bool filled) {
   int boxHalfH = half - 2;
-  int boxHalfW = (int)lroundf(boxHalfH * AVIATION_BOX_ASPECT);
-  int cx = rightX - boxHalfW;
+  int boxHalfW = aviationBoxHalfW(half);
   display.drawRect(cx - boxHalfW, cy - boxHalfH, boxHalfW * 2 + 1, boxHalfH * 2 + 1, GxEPD_BLACK);
 
   int bladeInset = 5;                  // gap between each blade's outer edge and the box's side
@@ -860,11 +866,12 @@ static CardIconKind cardIconKind(const AircraftHit &h) {
 //     glyph - see drawAviationIcon() above.
 //   - government/civil-watchlist match (alert == 'G'/'C'): the same box
 //     with an OUTLINED airscrew ("Aviation (Alternate)" style).
-// All icons share the same height and right edge. The star and the squawk
-// triangle also share the same width (outer radius/half-size = "half"); the
-// two aviation boxes are wider (NATO 1.5:1 frame), extending further left
-// toward the card text only - see drawAviationIcon() and the clearance
-// notes at the call site in renderAircraftTable().
+// All icons share the same height and the same center point (apexX, midY),
+// so they line up in one column when several cards are on screen. The star
+// and the squawk triangle share the same width (outer radius/half-size =
+// "half"); the two aviation boxes are wider (NATO 1.5:1 frame) - see
+// drawAviationIcon() and the placement/clearance notes at the call site in
+// renderAircraftTable().
 // If a card matches more than one of these at once, only one icon is drawn
 // - see cardIconKind() above for which one wins. The others are still
 // visible via their own flag letter in the card's flags text (e.g. an "E"
@@ -892,8 +899,7 @@ static void drawCardWarningIcon(int apexX, int midY, int half, CardIconKind kind
   } else if (kind == ICON_RUSSIAN) {
     drawFilledStar(apexX, midY, half);
   } else if (kind == ICON_MILITARY || kind == ICON_CIV_GOV) {
-    // Pinned to the same right edge the old square box had (apexX + half - 2).
-    drawAviationIcon(apexX + half - 2, midY, half, kind == ICON_MILITARY);
+    drawAviationIcon(apexX, midY, half, kind == ICON_MILITARY);
   }
 }
 
@@ -1004,15 +1010,17 @@ void renderAircraftTable()
 
       CardIconKind iconKind = cardIconKind(h);
       if (iconKind != ICON_NONE) {
-        // Right-aligned in the same margin as the card separator line,
-        // roughly equilateral, vertically centered across all three of
-        // this card's text lines (line 1 to line 3). Worst-case line 3
-        // width (longest altitude field, full speed/track, non-empty
-        // flags) still ends around x=290-305, well clear of the icon's
-        // zone: the star/triangle's left edge is at
-        // display.width()-14-2*iconHalf (~x=352), and the wider aviation
-        // box (military/gov/civ, NATO 1.5:1 frame, 47px wide) reaches
-        // further left, to ~x=338 - still ~30px+ of clear space. Lines 1
+        // All icon kinds share one center column, so a star, a squawk
+        // triangle and the aviation boxes line up with each other when
+        // several cards are on screen. The widest icon (the 47px aviation
+        // box) sets the column: its right edge sits at display.width()-16
+        // (x=384, near the card separator's right end), putting the shared
+        // center at x=361; the narrower star/triangle (34px) are centered
+        // on that same x (spanning ~x=344-378). Vertically centered across
+        // all three of this card's text lines (line 1 to line 3).
+        // Worst-case line 3 width (longest altitude field, full speed/
+        // track, non-empty flags) ends around x=290-305, well clear of the
+        // box's left edge at ~x=338 - still ~30px+ of clear space. Lines 1
         // and 2 are shorter still, so no width risk from them.
         // Vertical size is bounded by the card separator, drawn full-width
         // at y = line3Baseline+10: the icon's bottom (cardMidY+iconHalf,
@@ -1022,8 +1030,9 @@ void renderAircraftTable()
         // there - enlarge further with that margin in mind.
         int cardMidY = (line1Baseline + line3Baseline) / 2;
         int iconHalf = 17; // outer radius for the star, half-size for the triangle, half-height+2 for the aviation box
-        int iconApexX = (display.width() - 14) - iconHalf;
-        drawCardWarningIcon(iconApexX, cardMidY, iconHalf, iconKind);
+        int iconRightX = display.width() - 16; // right edge of the widest icon (the aviation box)
+        int iconCenterX = iconRightX - aviationBoxHalfW(iconHalf);
+        drawCardWarningIcon(iconCenterX, cardMidY, iconHalf, iconKind);
       }
 
       if (i < entriesToShow - 1) {
