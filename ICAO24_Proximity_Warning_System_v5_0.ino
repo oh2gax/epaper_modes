@@ -115,7 +115,7 @@ struct AircraftHit {
 // in a function signature has to be declared this early, or the
 // auto-generated prototype references it before it exists and the sketch
 // fails to compile ("'CardIconKind' does not name a type").
-enum CardIconKind { ICON_NONE, ICON_SQUAWK_ALARM, ICON_RUSSIAN, ICON_MILITARY };
+enum CardIconKind { ICON_NONE, ICON_SQUAWK_ALARM, ICON_RUSSIAN, ICON_MILITARY, ICON_CIV_GOV };
 
 // Russia's ICAO24 allocation block, exactly as modes_logger's own
 // is_russian_icao24() defines it server-side - computed independently
@@ -551,8 +551,11 @@ void processAircraftDoc()
 // display picks its first MAX_DISPLAY_ENTRIES cards, so a squawk alarm, a
 // Russian-flagged, or a military-flagged aircraft is never silently pushed
 // into "+N more" behind lower-priority traffic just because it happened to
-// appear later in the API response. Mirrored exactly by cardIconKind()
-// below, which uses this same precedence to pick each card's icon.
+// appear later in the API response. cardIconKind() below uses this same
+// precedence to pick each card's icon (plus one extra, lowest-precedence
+// icon for government/civil matches, which deliberately get NO sort boost
+// here: nearly every flagged aircraft is a mil/gov/civ match, so boosting
+// gov/civ too would make this tiering meaningless).
 static int flaggedPriorityTier(const AircraftHit &h) {
   if (h.squawkAlarm) return 0;
   if (h.isRussian) return 1;
@@ -777,46 +780,66 @@ static void drawFilledStar(int cx, int cy, int outerRadius) {
   }
 }
 
-// Draws a simplified NATO-style "fixed wing aircraft" icon: a closed square
-// box (per NATO APP-6 convention the real air-domain frame is open at the
-// bottom, but a closed box reads more cleanly at this icon's small size and
-// friend/hostile/neutral framing doesn't apply here anyway) containing a
-// two-blade airscrew/propeller glyph - APP-6's actual "fixed wing aircraft"
-// symbol is a stylized airscrew, not a plane-shaped silhouette. The
-// airscrew is simplified to a bowtie/hourglass: two triangles meeting at
-// the box's center, each running from a short vertical edge near the box's
-// left/right side to that center point. Box is inset slightly from the
-// shared "half" envelope (outerRadius on the star, half-size on the
-// triangle) so it doesn't read as visually heavier than the other two icon
-// shapes sharing this same slot.
-static void drawMilitaryIcon(int cx, int cy, int half) {
-  int boxHalf = half - 2;
-  display.drawRect(cx - boxHalf, cy - boxHalf, boxHalf * 2 + 1, boxHalf * 2 + 1, GxEPD_BLACK);
+// Width:height ratio of the aviation icon's box - 1.5:1 is the NATO APP-6
+// friendly-unit frame proportion (150x100 in the standard's own geometry).
+// With the shared 31px icon height this gives a 47x31px box.
+static const float AVIATION_BOX_ASPECT = 1.5f;
 
-  int bladeInset = 4;                 // gap between each blade's outer edge and the box edge
-  int bladeHalfHeight = boxHalf - 6;  // vertical half-height of each blade's outer edge
-  int bladeX = boxHalf - bladeInset;  // distance from center to each blade's outer edge
-  display.fillTriangle(cx - bladeX, cy - bladeHalfHeight,
-                        cx - bladeX, cy + bladeHalfHeight,
-                        cx, cy,
-                        GxEPD_BLACK);
-  display.fillTriangle(cx + bladeX, cy - bladeHalfHeight,
-                        cx + bladeX, cy + bladeHalfHeight,
-                        cx, cy,
-                        GxEPD_BLACK);
+// Draws a simplified NATO-style aviation icon: a closed rectangular box in
+// the NATO 1.5:1 frame proportion (per APP-6 the real air-domain frame is
+// open at the bottom, but a closed box reads more cleanly at this icon's
+// small size and friend/hostile/neutral framing doesn't apply here anyway)
+// containing a two-blade airscrew glyph, simplified to a bowtie/hourglass:
+// two triangles meeting at the box's center, each running from a short
+// vertical edge near the box's left/right side to that center point.
+//   filled = true:  solid blades - military-watchlist aircraft
+//   filled = false: outlined blades, the "Aviation (Alternate)" style -
+//                   government/civil-watchlist aircraft
+// (APP-6's own "fixed wing" glyph has rounded blade tips; tried in a
+// pixel-accurate preview first, but at this size the outlined version read
+// as an "infinity" sign rather than a propeller, so the straight-edged
+// bowtie was kept for both.)
+//
+// Unlike the star and the squawk triangle, this box is WIDER than the
+// shared square "half" envelope, so it's positioned by its RIGHT edge rather
+// than its center: rightX is pinned to where the old square box's right edge
+// was (the panel's right margin), and the extra width grows leftward toward
+// the card text only. The box height stays inset 2px from "half" (31px
+// tall at half=17), so its vertical clearance above the card separator is
+// unchanged.
+static void drawAviationIcon(int rightX, int cy, int half, bool filled) {
+  int boxHalfH = half - 2;
+  int boxHalfW = (int)lroundf(boxHalfH * AVIATION_BOX_ASPECT);
+  int cx = rightX - boxHalfW;
+  display.drawRect(cx - boxHalfW, cy - boxHalfH, boxHalfW * 2 + 1, boxHalfH * 2 + 1, GxEPD_BLACK);
+
+  int bladeInset = 5;                  // gap between each blade's outer edge and the box's side
+  int bladeHalfHeight = boxHalfH - 6;  // vertical half-height of each blade's outer edge
+  int bladeX = boxHalfW - bladeInset;  // distance from center to each blade's outer edge
+  for (int side = -1; side <= 1; side += 2) {
+    int ex = cx + side * bladeX;
+    if (filled) {
+      display.fillTriangle(ex, cy - bladeHalfHeight, ex, cy + bladeHalfHeight, cx, cy, GxEPD_BLACK);
+    } else {
+      display.drawTriangle(ex, cy - bladeHalfHeight, ex, cy + bladeHalfHeight, cx, cy, GxEPD_BLACK);
+    }
+  }
 }
 
 // Which single warning icon (if any) a card should show. Only one icon fits
 // in the card's icon slot, so this picks exactly one using the same
 // precedence flaggedPriorityTier() sorts by - squawk alarm beats Russian
-// beats military beats no icon at all - so "which icon wins" and "which
-// aircraft sorts first" can never disagree with each other. (CardIconKind
-// itself is declared up near AircraftHit, not here - see the comment there
-// for why.)
+// beats military - so "which icon wins" and "which aircraft sorts first"
+// can never disagree with each other. Government/civil matches come last:
+// they get an icon too, but no sort boost (see flaggedPriorityTier()).
+// Anything else (e.g. an "eastern" match that isn't Russian-registered)
+// gets no icon. (CardIconKind itself is declared up near AircraftHit, not
+// here - see the comment there for why.)
 static CardIconKind cardIconKind(const AircraftHit &h) {
   if (h.squawkAlarm) return ICON_SQUAWK_ALARM;
   if (h.isRussian) return ICON_RUSSIAN;
   if (h.alert == 'M') return ICON_MILITARY;
+  if (h.alert == 'G' || h.alert == 'C') return ICON_CIV_GOV;
   return ICON_NONE;
 }
 
@@ -833,11 +856,15 @@ static CardIconKind cardIconKind(const AircraftHit &h) {
 //   - Russian-registered (ICAO24 in 0x100000-0x1FFFFF): a SOLID filled
 //     five-pointed star (one point up), matching the familiar red-star
 //     symbol rather than a plain triangle - see drawFilledStar() above.
-//   - military-watchlist match (alert == 'M'): a boxed airscrew glyph - see
-//     drawMilitaryIcon() above.
-// All three share the same bounding box (outer radius/half-size = "half"),
-// so no position/clearance math elsewhere needs to change when the icon
-// kind changes.
+//   - military-watchlist match (alert == 'M'): a box with a FILLED airscrew
+//     glyph - see drawAviationIcon() above.
+//   - government/civil-watchlist match (alert == 'G'/'C'): the same box
+//     with an OUTLINED airscrew ("Aviation (Alternate)" style).
+// All icons share the same height and right edge. The star and the squawk
+// triangle also share the same width (outer radius/half-size = "half"); the
+// two aviation boxes are wider (NATO 1.5:1 frame), extending further left
+// toward the card text only - see drawAviationIcon() and the clearance
+// notes at the call site in renderAircraftTable().
 // If a card matches more than one of these at once, only one icon is drawn
 // - see cardIconKind() above for which one wins. The others are still
 // visible via their own flag letter in the card's flags text (e.g. an "E"
@@ -864,8 +891,9 @@ static void drawCardWarningIcon(int apexX, int midY, int half, CardIconKind kind
     display.setFont(&FreeMonoBold12pt7b); // restore - card text loop is mid-draw in 12pt
   } else if (kind == ICON_RUSSIAN) {
     drawFilledStar(apexX, midY, half);
-  } else if (kind == ICON_MILITARY) {
-    drawMilitaryIcon(apexX, midY, half);
+  } else if (kind == ICON_MILITARY || kind == ICON_CIV_GOV) {
+    // Pinned to the same right edge the old square box had (apexX + half - 2).
+    drawAviationIcon(apexX + half - 2, midY, half, kind == ICON_MILITARY);
   }
 }
 
@@ -898,10 +926,11 @@ static void drawCardWarningIcon(int apexX, int midY, int half, CardIconKind kind
 // preceded by its own space so a track ending in a digit never runs
 // straight into a following flag letter (e.g. "T254 E", not "T254E").
 // A Russian-registered aircraft gets a solid five-pointed star on the right
-// edge of its card, a military-watchlist match gets a boxed airscrew glyph,
-// and a squawk-alarm aircraft gets an outlined triangle with "!" instead
-// (see drawCardWarningIcon()/cardIconKind() above) - only one icon per
-// card even if more than one applies. Cards are pre-sorted by
+// edge of its card, a military-watchlist match gets a boxed filled airscrew
+// glyph, a government/civil-watchlist match gets the same box with an
+// outlined airscrew, and a squawk-alarm aircraft gets an outlined triangle
+// with "!" instead (see drawCardWarningIcon()/cardIconKind() above) - only
+// one icon per card even if more than one applies. Cards are pre-sorted by
 // sortFlaggedByPriority() (squawk alarm, then Russian-flagged, then
 // military-flagged, then the rest) so these are never the ones bumped into
 // "+N more" below.
@@ -979,10 +1008,12 @@ void renderAircraftTable()
         // roughly equilateral, vertically centered across all three of
         // this card's text lines (line 1 to line 3). Worst-case line 3
         // width (longest altitude field, full speed/track, non-empty
-        // flags) still ends around x=290-320, well clear of the icon's
-        // zone (left edge at display.width()-14-2*iconHalf, so ~x=352+
-        // at the current size) - lines 1 and 2 are shorter still, so no
-        // new width risk from adding the registration line above them.
+        // flags) still ends around x=290-305, well clear of the icon's
+        // zone: the star/triangle's left edge is at
+        // display.width()-14-2*iconHalf (~x=352), and the wider aviation
+        // box (military/gov/civ, NATO 1.5:1 frame, 47px wide) reaches
+        // further left, to ~x=338 - still ~30px+ of clear space. Lines 1
+        // and 2 are shorter still, so no width risk from them.
         // Vertical size is bounded by the card separator, drawn full-width
         // at y = line3Baseline+10: the icon's bottom (cardMidY+iconHalf,
         // i.e. line3Baseline-24+iconHalf) needs to stay comfortably above
@@ -990,7 +1021,7 @@ void renderAircraftTable()
         // the icon's own x-range. iconHalf=17 leaves ~16px of clearance
         // there - enlarge further with that margin in mind.
         int cardMidY = (line1Baseline + line3Baseline) / 2;
-        int iconHalf = 17; // outer radius for the star, half-size for the triangle/box
+        int iconHalf = 17; // outer radius for the star, half-size for the triangle, half-height+2 for the aviation box
         int iconApexX = (display.width() - 14) - iconHalf;
         drawCardWarningIcon(iconApexX, cardMidY, iconHalf, iconKind);
       }

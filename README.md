@@ -9,16 +9,16 @@ The device has no aircraft list of its own. `modes_logger` decides what's worth 
 - Polls `modes_logger`'s `/api/liveflights` endpoint every 10 seconds.
 - When one or more aircraft are flagged, draws them as compact three-line "cards" (registration, ICAO24, callsign, squawk, type, altitude, speed, track, and flag letters).
 - A Russian-registered aircraft (by ICAO24 allocation block) additionally gets a solid five-pointed star icon, detected independently on-device so it doesn't depend on any server-side toggle.
-- An aircraft matched by modes_logger's own military watchlist gets a boxed airscrew icon (a simplified NATO-style "fixed wing aircraft" symbol).
+- An aircraft matched by modes_logger's own military watchlist gets a NATO-style aviation icon: a box in the NATO 1.5:1 frame proportion with a filled airscrew inside. Government and civil watchlist matches get the same box with an outlined airscrew (the "Aviation (Alternate)" style).
 - An active emergency squawk (7500/7600/7700) draws a full-width inverse-video banner, forces an immediate redraw, and also puts an outlined warning-triangle-with-"!" icon on that aircraft's own card.
 - With nothing flagged, shows the current EFHK METAR/TAF (03:00–21:00 UTC) or a plain "APWS ONLINE" idle screen at night, refreshed on a fixed :00/:30 wall-clock grid.
 - Runs a small read-only web status page (WiFi signal, free heap, last-fetch status, weather API health) plus a `/restart` endpoint.
 - Built for long unattended uptime: task watchdog with self-restart, WiFi auto-reconnect, explicit HTTP timeouts, and a single reused JSON buffer to keep heap fragmentation down over weeks/months.
 
-<img src="DisplayScreenshot1.png" alt="APWS e-paper display showing two flagged aircraft cards - a Russian-registered aircraft with the solid star icon, and a military-watchlist aircraft with the boxed airscrew icon" width="416">
-<!-- 416px = 50% of the source screenshot's native 832px width. Plain markdown image syntax has no size control, so this uses GitHub's support for raw HTML in README files instead. -->
+<img src="DisplayScreenshot1.png" alt="APWS e-paper display showing three flagged aircraft cards - a Russian-registered aircraft with the solid star icon, a military-watchlist aircraft with the filled airscrew icon, and a civil-watchlist aircraft with the outlined airscrew icon" width="424">
+<!-- 424px = 50% of the image's native 848px width. Plain markdown image syntax has no size control, so this uses GitHub's support for raw HTML in README files instead. -->
 
-*The display with two flagged aircraft: a Russian-registered aircraft (star icon) and a military-watchlist match (boxed airscrew icon).*
+*The display with three flagged aircraft: a Russian-registered aircraft (star icon), a military-watchlist match (filled airscrew icon) and a civil-watchlist match (outlined airscrew icon). Pixel-accurate rendering of the panel, drawn with the same drawing routines and font as the device.*
 
 ## Hardware
 
@@ -47,7 +47,7 @@ The device has no aircraft list of its own. `modes_logger` decides what's worth 
     - the altitude field is prefixed `F` (flight level) at/above 5000ft or `A` (altitude) below it, followed by `+`/`-`/`=` for climb/descend/level and the selected/target altitude if the aircraft has one dialed in (rounded to the nearest hundred feet)
     - `S<speed>` in knots, `T<track>` as a 3-digit heading
     - trailing flag letters: `M`/`G`/`C`/`E` for a mil/gov/civ/eastern watchlist match, `!` for an active emergency squawk
-  - a Russian-registered aircraft gets a solid five-pointed star on the right edge of its card, a military-watchlist match gets a boxed airscrew icon, and a squawk-alarm aircraft gets an outlined triangle with "!" instead — only one icon per card if more than one applies, in that priority order (squawk alarm, then Russian, then military); the others are still visible via their own flag letter in the card's text
+  - a Russian-registered aircraft gets a solid five-pointed star on the right edge of its card, a military-watchlist match gets a boxed filled airscrew icon, a government/civil-watchlist match gets the same box with an outlined airscrew, and a squawk-alarm aircraft gets an outlined triangle with "!" instead — only one icon per card if more than one applies, in that priority order (squawk alarm, then Russian, then military, then government/civil); the others are still visible via their own flag letter in the card's text
   - up to 3 cards fit on screen at once; anything beyond that is summarized as "+N more" — squawk-alarm, Russian-flagged, and military-flagged aircraft are always sorted to the top first, in that order, so they're never the ones left out
   - a squawk alarm draws an inverse-video "!! SQUAWK ALARM !!" banner across the top instead of the normal header
   - after the last flagged aircraft has been gone for 60 seconds, the display reverts to the weather or idle screen
